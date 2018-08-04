@@ -1,0 +1,40 @@
+POS_CASH_balance
+原代码对整个数据做了onehot-encoder多了很多冗余数据
+原代码
+def pos_cash(num_rows=None, nan_as_category=True):
+	pos = pd.read_csv('/data2/feizhe/darknet/home_credit/POS_CASH_balance.csv', nrows=num_rows)
+	pos, cat_cols = one_hot_encoder(pos, nan_as_category=True)
+	# Features
+	aggregations = {
+		'MONTHS_BALANCE': ['max', 'mean', 'size'],
+		'SK_DPD': ['max', 'mean'],
+		'SK_DPD_DEF': ['max', 'mean']
+	}
+	for cat in cat_cols:
+		aggregations[cat] = ['mean']
+
+	pos_agg = pos.groupby('SK_ID_CURR').agg(aggregations)
+	pos_agg.columns = pd.Index(['POS_' + e[0] + "_" + e[1].upper() for e in pos_agg.columns.tolist()])
+	# Count pos cash accounts
+	pos_agg['POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
+	del pos
+	gc.collect()
+	return pos_agg
+ 
+修改为
+pos = pd.read_csv('POS_CASH_balance.csv')
+#只对状态变量做独热编码
+x,y = one_hot_encoder(pd.DataFrame(pos['NAME_CONTRACT_STATUS'])) 
+pos = pos.join(x)
+del pos['NAME_CONTRACT_STATUS']
+aggregations = {
+    'MONTHS_BALANCE': ['max', 'mean', 'size'],
+    'SK_DPD': ['max', 'mean','sum'],  #DPD (days past due) during the month of previous credit 
+    'SK_DPD_DEF': ['max', 'mean','sum'],
+    'CNT_INSTALMENT':['mean'],
+    'CNT_INSTALMENT_FUTURE':['mean','sum']} //Installments left to pay on the previous credit
+pos_agg = pos.groupby('SK_ID_CURR').agg(aggregations)
+pos_agg.columns = pd.Index(['POS_' + e[0] + "_" + e[1].upper() for e in pos_agg.columns.tolist()])
+pos_agg['POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
+del pos
+gc.collect()
